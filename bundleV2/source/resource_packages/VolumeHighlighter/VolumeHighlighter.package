@@ -1,0 +1,11 @@
+mod = [
+	"VolumeHighlighter"
+]
+
+package = [
+	"resource_packages/VolumeHighlighter/VolumeHighlighter"
+]
+
+lua = [
+	"scripts/mods/VolumeHighlighter/*"
+]

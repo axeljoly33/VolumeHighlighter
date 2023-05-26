@@ -26,6 +26,8 @@
 -- LUA UTILITIES --
 -------------------
 
+local new_poly = require("scripts/mods/VolumeHighlighter/poly")
+
 local mod = get_mod("VolumeHighlighter")
 
 -- Boolean
@@ -116,33 +118,25 @@ mod.highlight_collision = function (self)
     local range = mod:get("collision_fwd_dist")
     
     if (line % 2 == 0) and (column % 2 == 0) then
-        for i=1, line, 1 do
-            for j=1, column, 1 do
-                position = Vector3(camera_position["x"] + j*left_right["x"] + i*up_down["x"], camera_position["y"] + j*left_right["y"] + i*up_down["y"], camera_position["z"] + j*left_right["z"] + i*up_down["z"])
-            end
-        end
+        line = math.floor(line / 2) - 0.5
+        column = math.floor(column / 2) - 0.5
     elseif (line % 2 == 0) and not (column % 2 == 0) then
-        for i=1, line, 1 do
-            for j=1, column, 1 do
-                position = Vector3(camera_position["x"] + j*left_right["x"] + i*up_down["x"], camera_position["y"] + j*left_right["y"] + i*up_down["y"], camera_position["z"] + j*left_right["z"] + i*up_down["z"])
-            end
-        end
+        line = math.floor(line / 2) - 0.5
+        column = math.floor(column / 2)
     elseif not (line % 2 == 0) and (column % 2 == 0) then
-        for i=1, line, 1 do
-            for j=1, column, 1 do
-                position = Vector3(camera_position["x"] + j*left_right["x"] + i*up_down["x"], camera_position["y"] + j*left_right["y"] + i*up_down["y"], camera_position["z"] + j*left_right["z"] + i*up_down["z"])
-            end
-        end
+        line = math.floor(line / 2)
+        column = math.floor(column / 2) - 0.5
     else
-        for i=-math.floor(line / 2), math.floor(line / 2), 1 do
-            for j=-math.floor(column / 2), math.floor(column / 2), 1 do
-                position = Vector3(camera_position["x"] + j*left_right["x"] + i*up_down["x"], camera_position["y"] + j*left_right["y"] + i*up_down["y"], camera_position["z"] + j*left_right["z"] + i*up_down["z"])
-            end
-        end
+        line = math.floor(line / 2)
+        column = math.floor(column / 2)
     end
     
+    for i=-line, line, 1 do
+        for j=-column, column, 1 do
+            local ii = (mod:get("collision_line_inter_dist") * i) / 100
+            local jj = (mod:get("collision_column_inter_dist") * j) / 100
+            position = Vector3(camera_position["x"] + jj*left_right["x"] + ii*up_down["x"], camera_position["y"] + jj*left_right["y"] + ii*up_down["y"], camera_position["z"] + jj*left_right["z"] + ii*up_down["z"])
             is_hit, hit_pos, _, hit_norm, _ = PhysicsWorld.immediate_raycast(physics_world, position, camera_direction, range, "closest", "collision_filter", "filter_player_mover")
-            
             if is_hit then
                 QuickDrawerStay:circle(hit_pos, 0.1, hit_norm, color_collision)
                 QuickDrawerStay:vector(hit_pos, hit_norm * 0.1, color_collision)
@@ -151,8 +145,36 @@ mod.highlight_collision = function (self)
     end
 end
 
+local function draw_polygon (polygone)
+    mod:echo(polygone)
+    -- local world = Managers.world:world("level_world")
+    -- local gui = World.create_world_gui(world, Matrix4x4.identity(), 1, 1)
+    
+    -- local shape = {}
+    -- shape.poly = new_poly()
+    -- shape.poly:push_coord(polygone[1][1], polygone[1][2])
+    -- shape.poly:push_coord(polygone[2][1], polygone[2][2])
+    -- shape.poly:push_coord(polygone[3][1], polygone[3][2])
+    -- shape.poly:push_coord(polygone[4][1], polygone[4][2])
+    -- shape.poly:push_coord(polygone[5][1], polygone[5][2])
+    -- shape.poly:close()
+    -- if shape.poly:is_closed() then
+        -- shape.is_convex = shape.poly:is_convex()
+        -- shape.is_cw_winding = shape.poly:is_cw()
+        -- shape.triangles = shape.poly:get_triangles()
+    -- end
+    
+    -- for _,triangle in ipairs(shape.triangles) do
+        -- Gui.triangle(gui, Vector3(polygone[triangle[1]][1], polygone[triangle[1]][2], polygone[triangle[1]][3]), Vector3(polygone[triangle[2]][1], polygone[triangle[2]][2], polygone[triangle[2]][3]), Vector3(polygone[triangle[3]][1], polygone[triangle[3]][2], polygone[triangle[3]][3]), 2, Color(100, 255, 0, 0))
+        -- QuickDrawerStay:line(Vector3(polygone[triangle[1]][1], polygone[triangle[1]][2], polygone[triangle[1]][3]), Vector3(polygone[triangle[2]][1], polygone[triangle[2]][2], polygone[triangle[2]][3]), Color(255, 255, 0, 0))
+        -- QuickDrawerStay:line(Vector3(polygone[triangle[2]][1], polygone[triangle[2]][2], polygone[triangle[2]][3]), Vector3(polygone[triangle[3]][1], polygone[triangle[3]][2], polygone[triangle[3]][3]), Color(255, 255, 0, 0))
+        -- QuickDrawerStay:line(Vector3(polygone[triangle[3]][1], polygone[triangle[3]][2], polygone[triangle[3]][3]), Vector3(polygone[triangle[1]][1], polygone[triangle[1]][2], polygone[triangle[1]][3]), Color(255, 255, 0, 0))
+    -- end 
+end
+
 mod.highlight_dw = function (self)
     local world = Managers.world:world("level_world")
+    local gui = World.create_world_gui(world, Matrix4x4.identity(), 1, 1)
 	local level_settings = LevelHelper:current_level_settings(world)
 	local level_path = level_settings.level_name
 	local num_nested_levels = LevelResource.nested_level_count(level_path)
@@ -172,38 +194,51 @@ mod.highlight_dw = function (self)
 			if tag_volume_data.layer_name == "undefined" and (string.find(level_volume_name, "DZ") or string.find(level_volume_name, "dz")) and not string.find(level_volume_name, "skaven") then
                 local value = tag_volume_data.bottom_points
                 counts = #value
-                -- Bottom
-                for i = 1, (counts - 1), 1 do
-                    QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min), color_deathwall)
-                end
-                QuickDrawerStay:line(Vector3(value[counts][1], value[counts][2], tag_volume_data.alt_min), Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), color_deathwall)
-                if (counts == 4) then
-                    QuickDrawerStay:line(Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), Vector3(value[3][1], value[3][2], tag_volume_data.alt_min), color_deathwall)
-                    QuickDrawerStay:line(Vector3(value[2][1], value[2][2], tag_volume_data.alt_min), Vector3(value[4][1], value[4][2], tag_volume_data.alt_min), color_deathwall)
-                end
+                -- -- Bottom
+                -- for i = 1, (counts - 1), 1 do
+                    -- QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min), color_deathwall)
+                -- end
+                -- QuickDrawerStay:line(Vector3(value[counts][1], value[counts][2], tag_volume_data.alt_min), Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), color_deathwall)
+                -- if (counts == 4) then
+                    -- QuickDrawerStay:line(Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), Vector3(value[3][1], value[3][2], tag_volume_data.alt_min), color_deathwall)
+                    -- QuickDrawerStay:line(Vector3(value[2][1], value[2][2], tag_volume_data.alt_min), Vector3(value[4][1], value[4][2], tag_volume_data.alt_min), color_deathwall)
+                -- end
                 
-                -- Top
-                for i = 1, (counts - 1), 1 do
-                    QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max), color_deathwall)
-                end
-                QuickDrawerStay:line(Vector3(value[counts][1], value[counts][2], tag_volume_data.alt_max), Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), color_deathwall)
-                if (counts == 4) then
-                    QuickDrawerStay:line(Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), Vector3(value[3][1], value[3][2], tag_volume_data.alt_max), color_deathwall)
-                    QuickDrawerStay:line(Vector3(value[2][1], value[2][2], tag_volume_data.alt_max), Vector3(value[4][1], value[4][2], tag_volume_data.alt_max), color_deathwall)
-                end
+                -- -- Top
+                -- for i = 1, (counts - 1), 1 do
+                    -- QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max), color_deathwall)
+                -- end
+                -- QuickDrawerStay:line(Vector3(value[counts][1], value[counts][2], tag_volume_data.alt_max), Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), color_deathwall)
+                -- if (counts == 4) then
+                    -- QuickDrawerStay:line(Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), Vector3(value[3][1], value[3][2], tag_volume_data.alt_max), color_deathwall)
+                    -- QuickDrawerStay:line(Vector3(value[2][1], value[2][2], tag_volume_data.alt_max), Vector3(value[4][1], value[4][2], tag_volume_data.alt_max), color_deathwall)
+                -- end
                 
-                -- Sides
-                for i = 1, counts, 1 do
-                    QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), color_deathwall)
+                -- -- Sides
+                -- for i = 1, counts, 1 do
+                    -- QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), color_deathwall)
                     
-                    if i == counts then
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), color_deathwall)
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), color_deathwall)
-                    else
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max), color_deathwall)
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min), color_deathwall)
-                    end
+                    -- if i == counts then
+                        -- QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), color_deathwall)
+                        -- QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), color_deathwall)
+                    -- else
+                        -- QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max), color_deathwall)
+                        -- QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min), color_deathwall)
+                    -- end
+                -- end
+                
+                -- Triangles
+                
+                local polygon = {}
+                for i = 1, counts, 1 do
+                    polygon[i] = {value[i][1], value[i][2], tag_volume_data.alt_min}
                 end
+                print(level_volume_name.." ; "tostring(polygon))
+                draw_polygon(polygone)
+                for i = 1, counts, 1 do
+                    polygon[i] = {value[i][1], value[i][2], tag_volume_data.alt_max}
+                end
+                draw_polygon(polygone)
 			end
 		end
 	end

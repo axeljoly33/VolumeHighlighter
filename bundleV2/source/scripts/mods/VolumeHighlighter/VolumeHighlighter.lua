@@ -26,10 +26,16 @@
 -- LUA UTILITIES --
 -------------------
 
+local new_poly = require("scripts/mods/VolumeHighlighter/poly")
+
 local mod = get_mod("VolumeHighlighter")
 
 -- Boolean
 mod.is_ingame = false
+
+-- Globals
+mod.gui = nil
+mod.id = nil
 
 -- Modifications
 script_data.debug_enabled = true
@@ -143,8 +149,34 @@ mod.highlight_collision = function (self)
     end
 end
 
+function draw_polygon (polygone)
+    local world = Managers.world:world("level_world")
+    local gui = mod.gui
+    
+    local shape = {}
+    shape.poly = new_poly()
+    for i = 1, #polygone, 1 do
+        shape.poly:push_coord(polygone[i][1], polygone[i][2])
+    end
+    shape.poly:close()
+    if shape.poly:is_closed() then
+        shape.is_convex = shape.poly:is_convex()
+        shape.is_cw_winding = shape.poly:is_cw()
+        shape.triangles = shape.poly:get_triangles()
+    end
+    
+    for _,triangle in ipairs(shape.triangles) do
+        Gui.triangle(gui, Vector3(polygone[triangle[1]][1], polygone[triangle[1]][2], polygone[triangle[1]][3]), Vector3(polygone[triangle[2]][1], polygone[triangle[2]][2], polygone[triangle[2]][3]), Vector3(polygone[triangle[3]][1], polygone[triangle[3]][2], polygone[triangle[3]][3]), 2, Color(100, mod:get("deathwall_red"), mod:get("deathwall_green"), mod:get("deathwall_blue")))
+        QuickDrawerStay:line(Vector3(polygone[triangle[1]][1], polygone[triangle[1]][2], polygone[triangle[1]][3]), Vector3(polygone[triangle[2]][1], polygone[triangle[2]][2], polygone[triangle[2]][3]), Color(255, mod:get("deathwall_red"), mod:get("deathwall_green"), mod:get("deathwall_blue")))
+        QuickDrawerStay:line(Vector3(polygone[triangle[2]][1], polygone[triangle[2]][2], polygone[triangle[2]][3]), Vector3(polygone[triangle[3]][1], polygone[triangle[3]][2], polygone[triangle[3]][3]), Color(255, mod:get("deathwall_red"), mod:get("deathwall_green"), mod:get("deathwall_blue")))
+        QuickDrawerStay:line(Vector3(polygone[triangle[3]][1], polygone[triangle[3]][2], polygone[triangle[3]][3]), Vector3(polygone[triangle[1]][1], polygone[triangle[1]][2], polygone[triangle[1]][3]), Color(255, mod:get("deathwall_red"), mod:get("deathwall_green"), mod:get("deathwall_blue")))
+    end 
+end
+
 mod.highlight_dw = function (self)
     local world = Managers.world:world("level_world")
+    local gui = World.create_world_gui(world, Matrix4x4.identity(), 1, 1)
+    mod.gui = gui
 	local level_settings = LevelHelper:current_level_settings(world)
 	local level_path = level_settings.level_name
 	local num_nested_levels = LevelResource.nested_level_count(level_path)
@@ -164,37 +196,34 @@ mod.highlight_dw = function (self)
 			if tag_volume_data.layer_name == "undefined" and (string.find(level_volume_name, "DZ") or string.find(level_volume_name, "dz")) and not string.find(level_volume_name, "skaven") then
                 local value = tag_volume_data.bottom_points
                 counts = #value
-                -- Bottom
-                for i = 1, (counts - 1), 1 do
-                    QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min), color_deathwall)
-                end
-                QuickDrawerStay:line(Vector3(value[counts][1], value[counts][2], tag_volume_data.alt_min), Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), color_deathwall)
-                if (counts == 4) then
-                    QuickDrawerStay:line(Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), Vector3(value[3][1], value[3][2], tag_volume_data.alt_min), color_deathwall)
-                    QuickDrawerStay:line(Vector3(value[2][1], value[2][2], tag_volume_data.alt_min), Vector3(value[4][1], value[4][2], tag_volume_data.alt_min), color_deathwall)
-                end
                 
-                -- Top
-                for i = 1, (counts - 1), 1 do
-                    QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max), color_deathwall)
-                end
-                QuickDrawerStay:line(Vector3(value[counts][1], value[counts][2], tag_volume_data.alt_max), Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), color_deathwall)
-                if (counts == 4) then
-                    QuickDrawerStay:line(Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), Vector3(value[3][1], value[3][2], tag_volume_data.alt_max), color_deathwall)
-                    QuickDrawerStay:line(Vector3(value[2][1], value[2][2], tag_volume_data.alt_max), Vector3(value[4][1], value[4][2], tag_volume_data.alt_max), color_deathwall)
-                end
-                
-                -- Sides
+                -- Triangles
+                local polygone = {}
                 for i = 1, counts, 1 do
-                    QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), color_deathwall)
-                    
+                    polygone[i] = {value[i][1], value[i][2], tag_volume_data.alt_min}
+                end
+                draw_polygon(polygone) -- Bottom
+                for i = 1, counts, 1 do
+                    polygone[i] = {value[i][1], value[i][2], tag_volume_data.alt_max}
+                end
+                draw_polygon(polygone) -- Top
+                
+                for i = 1, counts, 1 do
+                    polygone[i] = nil
+                end
+                for i = 1, counts, 1 do
                     if i == counts then
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[1][1], value[1][2], tag_volume_data.alt_max), color_deathwall)
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[1][1], value[1][2], tag_volume_data.alt_min), color_deathwall)
+                        polygone[1] = {value[i][1], value[i][2], tag_volume_data.alt_min}
+                        polygone[2] = {value[i][1], value[i][2], tag_volume_data.alt_max}
+                        polygone[3] = {value[1][1], value[1][2], tag_volume_data.alt_max}
+                        polygone[4] = {value[1][1], value[1][2], tag_volume_data.alt_min}
                     else
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_min), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max), color_deathwall)
-                        QuickDrawerStay:line(Vector3(value[i][1], value[i][2], tag_volume_data.alt_max), Vector3(value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min), color_deathwall)
+                        polygone[1] = {value[i][1], value[i][2], tag_volume_data.alt_min}
+                        polygone[2] = {value[i][1], value[i][2], tag_volume_data.alt_max}
+                        polygone[3] = {value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max}
+                        polygone[4] = {value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min}
                     end
+                    draw_polygon(polygone) -- Sides
                 end
 			end
 		end
@@ -204,6 +233,10 @@ end
 mod.remove_highlights = function (self)
     QuickDrawer:reset()
     QuickDrawerStay:reset()
+    if mod.gui then
+        local world = Managers.world:world("level_world")
+        World.destroy_gui(world, mod.gui) 
+    end
 end
 
 -- USER FUNCTIONS --

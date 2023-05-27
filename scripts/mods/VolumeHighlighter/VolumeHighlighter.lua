@@ -175,59 +175,62 @@ end
 
 mod.highlight_dw = function (self)
     local world = Managers.world:world("level_world")
-    local gui = World.create_world_gui(world, Matrix4x4.identity(), 1, 1)
-    mod.gui = gui
-	local level_settings = LevelHelper:current_level_settings(world)
-	local level_path = level_settings.level_name
-	local num_nested_levels = LevelResource.nested_level_count(level_path)
-	if num_nested_levels > 0 then
-		level_path = LevelResource.nested_level_resource_name(level_path, 0)
-	end
-	local file_path = level_path .. "_nav_tag_volumes"
-    local self_mappings = {}
-    
-    local color_deathwall = Color(mod:get("deathwall_alpha"), mod:get("deathwall_red"), mod:get("deathwall_green"), mod:get("deathwall_blue")) or Color(255, 255, 255, 255)
-    
-	if Application.can_get("lua", file_path) then
-		local mappings = require(file_path)
-		self_mappings = table.clone(mappings.nav_tag_volumes)
+    if not mod.gui then
+        local gui = World.create_world_gui(world, Matrix4x4.identity(), 1, 1)
+        mod.gui = gui
+        local level_settings = LevelHelper:current_level_settings(world)
+        local level_path = level_settings.level_name
+        local num_nested_levels = LevelResource.nested_level_count(level_path)
+        if num_nested_levels > 0 then
+            level_path = LevelResource.nested_level_resource_name(level_path, 0)
+        end
+        local file_path = level_path .. "_nav_tag_volumes"
+        local self_mappings = {}
         
-		for level_volume_name, tag_volume_data in pairs(self_mappings) do
-			if tag_volume_data.layer_name == "undefined" and (string.find(level_volume_name, "DZ") or string.find(level_volume_name, "dz")) and not string.find(level_volume_name, "skaven") then
-                local value = tag_volume_data.bottom_points
-                counts = #value
-                
-                -- Triangles
-                local polygone = {}
-                for i = 1, counts, 1 do
-                    polygone[i] = {value[i][1], value[i][2], tag_volume_data.alt_min}
-                end
-                draw_polygon(polygone) -- Bottom
-                for i = 1, counts, 1 do
-                    polygone[i] = {value[i][1], value[i][2], tag_volume_data.alt_max}
-                end
-                draw_polygon(polygone) -- Top
-                
-                for i = 1, counts, 1 do
-                    polygone[i] = nil
-                end
-                for i = 1, counts, 1 do
-                    if i == counts then
-                        polygone[1] = {value[i][1], value[i][2], tag_volume_data.alt_min}
-                        polygone[2] = {value[i][1], value[i][2], tag_volume_data.alt_max}
-                        polygone[3] = {value[1][1], value[1][2], tag_volume_data.alt_max}
-                        polygone[4] = {value[1][1], value[1][2], tag_volume_data.alt_min}
-                    else
-                        polygone[1] = {value[i][1], value[i][2], tag_volume_data.alt_min}
-                        polygone[2] = {value[i][1], value[i][2], tag_volume_data.alt_max}
-                        polygone[3] = {value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max}
-                        polygone[4] = {value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min}
+        local color_deathwall = Color(mod:get("deathwall_alpha"), mod:get("deathwall_red"), mod:get("deathwall_green"), mod:get("deathwall_blue")) or Color(255, 255, 255, 255)
+        
+        if Application.can_get("lua", file_path) then
+            local mappings = require(file_path)
+            self_mappings = table.clone(mappings.nav_tag_volumes)
+            
+            for level_volume_name, tag_volume_data in pairs(self_mappings) do
+                if tag_volume_data.layer_name == "undefined" and (string.find(level_volume_name, "DZ") or string.find(level_volume_name, "dz")) and not string.find(level_volume_name, "skaven") then
+                    local value = tag_volume_data.bottom_points
+                    counts = #value
+                    
+                    -- Triangles
+                    local polygone = {}
+                    for i = 1, counts, 1 do
+                        polygone[i] = {value[i][1], value[i][2], tag_volume_data.alt_min}
                     end
-                    draw_polygon(polygone) -- Sides
+                    draw_polygon(polygone) -- Bottom
+                    for i = 1, counts, 1 do
+                        polygone[i] = {value[i][1], value[i][2], tag_volume_data.alt_max}
+                    end
+                    draw_polygon(polygone) -- Top
+                    
+                    for i = 1, counts, 1 do
+                        polygone[i] = nil
+                    end
+                    for i = 1, counts, 1 do
+                        if i == counts then
+                            polygone[1] = {value[i][1], value[i][2], tag_volume_data.alt_min}
+                            polygone[2] = {value[i][1], value[i][2], tag_volume_data.alt_max}
+                            polygone[3] = {value[1][1], value[1][2], tag_volume_data.alt_max}
+                            polygone[4] = {value[1][1], value[1][2], tag_volume_data.alt_min}
+                        else
+                            polygone[1] = {value[i][1], value[i][2], tag_volume_data.alt_min}
+                            polygone[2] = {value[i][1], value[i][2], tag_volume_data.alt_max}
+                            polygone[3] = {value[i + 1][1], value[i + 1][2], tag_volume_data.alt_max}
+                            polygone[4] = {value[i + 1][1], value[i + 1][2], tag_volume_data.alt_min}
+                        end
+                        draw_polygon(polygone) -- Sides
+                    end
                 end
-			end
-		end
-	end
+            end
+        end
+
+    end
 end
 
 mod.remove_highlights = function (self)
@@ -235,7 +238,8 @@ mod.remove_highlights = function (self)
     QuickDrawerStay:reset()
     if mod.gui then
         local world = Managers.world:world("level_world")
-        World.destroy_gui(world, mod.gui) 
+        World.destroy_gui(world, mod.gui)
+        mod.gui = nil
     end
 end
 
